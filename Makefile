@@ -8,20 +8,30 @@ HOST := $(shell hostname)
 CC := gcc
 CFLAGS += -I$(INCLUDEDIR) -Wall -Wextra -O2 -lm
 
-ifneq ($(seed),)
-	CFLAGS += -DRAND_SEED=$(seed)
+ifneq ($(HOST),boron)
+CFLAGS += -lrt -std=gnu99
 endif
 
 ifneq ($(debug),)
-	CFLAGS += -DDEBUG
+CFLAGS += -DDEBUG
 endif
 
 objs := common grav
 OBJECTS := $(objs:%=$(OBJDIR)/\%-%.o)
 
-.PHONY: singlethreaded multithreaded bench clean cleanbench
+.PHONY: singlethreaded multithreaded bench clean cleanbench cleanall
 
 all: singlethreaded multithreaded
+
+#reproducibility
+ifneq ($(seed),)
+CFLAGS += -DRAND_SEED=$(seed)
+else
+bench: CFLAGS += -DRAND_SEED=42
+endif
+
+bench: all cleanbench perf/bench.sh
+	./perf/bench.sh
 
 singlethreaded: CFLAGS += -Wno-unknown-pragmas
 singlethreaded: single-quadratic single-barneshut
@@ -29,7 +39,8 @@ singlethreaded: single-quadratic single-barneshut
 multithreaded: CFLAGS += -fopenmp
 multithreaded: multi-quadratic multi-barneshut
 
-bench: all cleanbench
+cleanall: clean cleanbench
+	@echo cleaning all
 
 clean:
 	rm -rf $(OBJDIR)/*
