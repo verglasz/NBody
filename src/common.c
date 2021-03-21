@@ -9,12 +9,7 @@ void show_elapsed_time(struct timespec start, struct timespec end) {
         nsec += 1e9;
         seconds -= 1;
     }
-    int mins = seconds / 60;
-    double secs = (seconds % 60) + nsec * 1e-9;
-    printf(" Total elapsed time: ");
-    if (mins > 0) {
-        fprintf(stderr, "%d minutes, ", mins);
-    }
-    printf("%.3f seconds\n", secs);
+    double secs = seconds + nsec * 1e-9;
+    printf(" Total elapsed time: %.3f seconds\n", secs);
 }
 

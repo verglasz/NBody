@@ -30,8 +30,12 @@ else
 bench: CFLAGS += -DRAND_SEED=42
 endif
 
-bench: all cleanbench perf/bench.sh
-	./perf/bench.sh
+bench: cleanall perf/bench.sh perf/data
+	$(MAKE) all
+
+
+perf/data:
+	mkdir $@
 
 singlethreaded: CFLAGS += -Wno-unknown-pragmas
 singlethreaded: single-quadratic single-barneshut
@@ -40,11 +44,10 @@ multithreaded: CFLAGS += -fopenmp
 multithreaded: multi-quadratic multi-barneshut
 
 cleanall: clean cleanbench
-	@echo cleaning all
+	rm -rf {single,multi}-{barneshut,quadratic}
 
 clean:
 	rm -rf $(OBJDIR)/*
-	rm -rf {single,multi}-{barneshut,quadratic}
 
 cleanbench:
 	rm -rf $(BENCHDIR)/$(HOST)-*

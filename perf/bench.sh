@@ -1,9 +1,14 @@
 #!/bin/sh
 
 runs=${1:-10}
-max_t=${2:-15}
-steps=100000
+max_t=${2:-$(nproc)}
 far=0.9
+
+if [ "$(hostname)" = "boron"]; then
+	steps=500000
+else
+	steps=60000
+fi
 
 bodies="120 180 240"
 
@@ -39,7 +44,8 @@ function testprog {
 
 for prog in {quadratic,barneshut}; do
 	for b in $bodies; do
-		testprog $prog $b
+		echo $prog with $b
+		# testprog $prog $b
 	done
 done
 
