@@ -4,7 +4,7 @@ runs=${1:-10}
 max_t=${2:-$(nproc)}
 far=0.9
 
-if [ "$(hostname)" = "boron"]; then
+if [ "$(hostname)" = "boron" ]; then
 	steps=500000
 else
 	steps=60000
@@ -43,8 +43,10 @@ function testprog {
 
 for prog in {quadratic,barneshut}; do
 	outfile="perf/data/$(hostname)-${prog}"
-	for b in $bodies; do
-		echo $prog with $b
+	echo "doing $prog, will do bodies = ($bodies)" >&2
+	thebodies=$bodies
+	for b in $thebodies; do
+		echo $prog with $b >&2
 		testprog $prog $b >> $outfile
 	done
 done
