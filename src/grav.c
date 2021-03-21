@@ -62,7 +62,6 @@ void init_body(Body *b) {
 
 void init_bodies(Body bodies[], int len) {
 	srandom(RAND_SEED);
-#pragma omp parallel for
 	for (int i=0; i<len; i++) {
 		init_body(&bodies[i]);
 	}
