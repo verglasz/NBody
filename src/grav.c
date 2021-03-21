@@ -11,6 +11,7 @@
 
 const double MASS_MIN = 1;
 const double MASS_RANGE = 50;
+const double REPULSIVE_DISTANCE = 1e-4 * POS_RANGE;
 
 const double G_CONSTANT = 6.6743e-11;
 
@@ -79,15 +80,11 @@ Acceleration gravitational_acc(Position at, Position source, double mass) {
 	Acceleration acc;
 	Vec3 r = vec_diff(source, at); // r points toward source
 	double d = length(r);
-	double modulus;
-	if (d > 1e-4 * POS_RANGE) {
-		modulus = G_CONSTANT * mass / (d * d);
-	} else { // the particles are too close, we need to push them apart a bit
-		modulus = -1e-3;
-	}
-	acc.x = modulus * r.x / d;
-	acc.y = modulus * r.y / d;
-	acc.z = modulus * r.z / d;
+	// a small repulsive component prevents things from getting too close to each other
+	double dmodulus = G_CONSTANT * mass / (d * d * d) * (1 - REPULSIVE_DISTANCE/d);
+	acc.x = dmodulus * r.x;
+	acc.y = dmodulus * r.y;
+	acc.z = dmodulus * r.z;
 	return acc;
 }
 
