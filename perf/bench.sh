@@ -29,23 +29,23 @@ function doruns {
 function testprog {
 	progname=$1
 	bodies=$2
-	outfile="perf/data/$(hostname)-${progname}"
 	args="$bodies $steps"
 	if [ "$progname" = "barneshut" ]; then
 		args="$args $far"
 	fi
 	prefix="single $bodies"
-	doruns "./single-$progname $args" "$prefix" >> $outfile
+	doruns "./single-$progname $args" "$prefix"
 	for threads in $(seq $max_t); do
 		prefix="$threads $bodies"
-		doruns "./multi-$progname $args $threads" "$prefix" >> $outfile
+		doruns "./multi-$progname $args $threads" "$prefix"
 	done
 }
 
 for prog in {quadratic,barneshut}; do
+	outfile="perf/data/$(hostname)-${prog}"
 	for b in $bodies; do
 		echo $prog with $b
-		# testprog $prog $b
+		testprog $prog $b >> $outfile
 	done
 done
 
