@@ -40,12 +40,7 @@ int main(int argc, char ** argv) {
 		return 1;
 	}
 	init_openmp(args.workers);
-    struct timespec start;
-    struct timespec end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
     run(args.num_bodies, args.steps, args.far);
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    show_elapsed_time(start, end);
 	return 0;
 }
 
@@ -83,10 +78,15 @@ void run(int num_bodies, int steps, double far_threshold) {
 	Acceleration * accels = (Acceleration *) malloc(sizeof(Acceleration) * num_bodies);
 	BHTree * tree = new_tree(num_bodies);
 	init_bodies(bodies, num_bodies);
+    struct timespec start;
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
 	for (int i=0; i<steps; i++) {
 		simulation_step(tree, bodies, num_bodies, accels, far_threshold);
 		debug("\n---- step completed ----\n\n");
 	}
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    show_elapsed_time(start, end);
 	destroy_tree(tree);
 	free(bodies);
 	free(accels);
@@ -334,11 +334,10 @@ Acceleration get_accel_from_node(const Body * on, const BHNode * node, const Nod
 	if (is_far) {
 		return gravitational_acc(on->pos, node->center_of_mass, node->mass);
 	} else {
-		Acceleration total = {0, 0, 0};
-		Acceleration a;
+		Acceleration total = {0., 0., 0.};
 		for (int i=0; i<8; i++) {
 			const BHChild * child = &node->children[i];
-			a = get_accel_from_child(on, child, buffer, far_threshold);
+			Acceleration a = get_accel_from_child(on, child, buffer, far_threshold);
 			vec_accumulate(&total, a);
 		}
 		return total;

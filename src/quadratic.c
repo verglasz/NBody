@@ -24,12 +24,7 @@ int main(int argc, char ** argv) {
 		return 1;
 	}
 	omp_set_num_threads(args.workers);
-    struct timespec start;
-    struct timespec end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
     run(args.num_bodies, args.steps);
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    show_elapsed_time(start, end);
 	return 0;
 }
 
@@ -55,13 +50,18 @@ int parse_args(Args * parsed, int argc, char **argv) {
 }
 
 Acceleration get_total_accel(int current, Body bodies[], int num_bodies) {
-		Acceleration total = {0, 0, 0};
-		for (int i=0; i<num_bodies; i++) {
-			if (i == current || !body_is_in_bounds(&bodies[i])) continue;
-			Acceleration a = gravitational_acc(bodies[current].pos, bodies[i].pos, bodies[i].mass);
+	Acceleration total = {0, 0, 0};
+	for (int i=0; i<num_bodies; i++) {
+		if (i != current && body_is_in_bounds(&bodies[i])) {
+			Acceleration a = gravitational_acc(
+				bodies[current].pos,
+				bodies[i].pos,
+				bodies[i].mass
+			);
 			vec_accumulate(&total, a);
 		}
-		return total;
+	}
+	return total;
 }
 
 void simulation_step(Body bodies[], int num_bodies, Acceleration accels[]) {
@@ -81,9 +81,14 @@ void run(int num_bodies, int steps) {
 	Body * bodies = (Body *) malloc(sizeof(Body) * num_bodies);
 	Acceleration * accels = (Acceleration *) malloc(sizeof(Acceleration) * num_bodies);
 	init_bodies(bodies, num_bodies);
+    struct timespec start;
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
 	for (int i=0; i<steps; i++) {
 		simulation_step(bodies, num_bodies, accels);
 	}
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    show_elapsed_time(start, end);
 	free(bodies);
 	free(accels);
 }
