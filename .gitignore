@@ -1,4 +1,5 @@
 perf/data
+perf/*.pdf
 report/*.aux
 report/*.out
 report/*.log
