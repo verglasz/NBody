@@ -1,0 +1,287 @@
+%!TeX program = lualatex
+\documentclass[a4paper, 11pt]{article}
+
+\usepackage{fontspec}
+\usepackage[english]{babel}
+\usepackage{amsmath,amsfonts,amsthm}
+\usepackage{setspace}
+\usepackage{geometry}
+\usepackage{rotating}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{chngcntr}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{microtype}
+\usepackage{titling}
+\usepackage{titlesec}
+\usepackage{background}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{karnaugh-map}
+\usepackage{siunitx}
+\usepackage{tikz}
+
+% ----- OPTION SETUP -----
+
+\setmainfont{EB Garamond}
+\setsansfont{Gill Sans MT Book}
+\setmonofont{AnonymousPro}[Scale=MatchLowercase]
+\setmathrm{EB Garamond}
+
+\newfontfamily\notosym{Noto Sans Symbols2}
+
+\geometry{left = 2cm, right = 2cm, top = 2.5cm, bottom = 2.5cm}
+\newcommand\titlegeometry{\newgeometry{left = 5cm, right = 5cm, top = 5cm, bottom = 5cm}}
+
+\setitemize{noitemsep, topsep=0pt, parsep=0pt, partopsep=0pt}
+
+\titleformat*{\subsection}{\large\bfseries}
+\counterwithin*{figure}{section}
+\counterwithin*{table}{section}
+\renewcommand{\thetable}{\arabic{section}.\arabic{table}}
+\renewcommand{\thefigure}{\arabic{section}.\arabic{figure}}
+
+% \newcommand*\module[1]{\clearpage \section{Module \arabic{section} {#1}}}
+
+% \renewcommand{\thesection}{}
+% \renewcommand{\thesubsection}{\arabic{section}.\arabic{subsection}}
+% \makeatletter
+% \def\@seccntformat#1{\csname #1ignore\expandafter\endcsname\csname the#1\endcsname\quad}
+% \let\sectionignore\@gobbletwo
+% \let\latex@numberline\numberline
+% \def\numberline#1{\if\relax#1\relax\else\latex@numberline{#1}\fi}
+% \makeatother
+
+\usetikzlibrary{
+    matrix,
+    calc,
+    automata,
+    positioning,
+}
+\tikzset{
+    between/.style args={#1 and #2}{
+         at = ($(#1)!0.5!(#2)$)
+    }
+    cell/.style = {
+        nodes = {
+            rectangle,
+            draw = black,
+        },
+    },
+    vectormat/.style = {
+        matrix of nodes,
+        minimum height = 2.5em,
+        minimum width = 2.5em,
+        row sep = -\pgflinewidth,
+        column sep = -\pgflinewidth,
+    },
+    node distance = 15pt,
+    nodes in empty cells,
+    text depth=0.5ex,
+    text height=2ex,
+}
+
+\hypersetup{ %
+    colorlinks = true,
+    linkcolor = [RGB]{29, 120, 91},
+    urlcolor = [RGB]{120, 29, 29},
+}
+
+\graphicspath{ {/home/verglasz/media/images/logos} }
+
+% --------- UTILITY MACROS --------
+
+\newcommand\comment[1]{\relax}
+\newcommand*\mailto[1]{\href{mailto:#1}{\nolinkurl{#1}}}
+
+\definecolor{CodeBG}{RGB}{27,31,35}
+\newtcbox\code[1][{}]{
+    nobeforeafter,
+    tcbox raise base,
+    size=tight,
+    colframe=CodeBG,
+    fontupper=\ttfamily\small,
+    arc=3pt,
+    boxsep=2pt,
+    left=1pt,
+    right=1pt,
+    opacityback=0.95,
+    boxrule=0pt,
+    opacityframe=0,
+    #1
+}
+\newcommand*\omp[1]{\code{\#pragma omp #1}}
+
+\newcommand*\fig[1]{figure~\ref{fig:#1}}
+\newcommand*\eq[1]{equation~\ref{eq:#1}}
+\newcommand*\tab[1]{table~\ref{tab:#1}}
+
+\newcommand*\xor{\oplus}
+
+\makeatletter
+\newcommand*{\rn}[1]{\expandafter\@slowromancap\romannumeral #1@}
+\newcommand*\currentx{\the\tikz@lastxsaved}
+\newcommand*\currenty{\the\tikz@lastysaved}
+\makeatother
+\newcommand*\currentcoordinate{\currentx,\currenty}
+
+\makeatletter
+\def\vecmatrix (#1) #2 {
+    \gdef\a@sep{\noexpand\a@sep}
+    \gdef\my@cols{}
+    \foreach \i in {0,...,#2} { \xdef\my@cols{\my@cols \i \a@sep} }
+    \gdef\a@sep{ \& \\ }
+    \matrix (#1) [
+        below = of varname,
+        vectormat,
+        column 1/.style = {font = \ttfamily},
+        column 2/.style = {cell},
+        ampersand replacement = \&,
+    ] {
+        \my@cols
+    }
+}
+\makeatother
+
+% ----- CUSTOMIZATION -----
+
+\newcommand*\kthmail{\mailto{lomanto@kth.se}}
+\newcommand*\personalmail{\mailto{gv.lomanto@gmail.com}}
+\newcommand*\firstname{V\kern-0.145em{}alerio}
+\newcommand*\lastname{Lomanto}
+\newcommand*\ddob{17}
+\newcommand*\mmob{07}
+\newcommand*\yyob{1995}
+\newcommand*\pnlast{0174}
+
+\newcommand*\thisyear{2021}
+\newcommand*\thiscourse{Concurrent Programming}
+\newcommand*\thisreport{\!}
+\newcommand*\thisprogram{TCOMK}
+\newcommand*\thisperiod{VT21}
+
+\newcommand*\fullname{\firstname~~\lastname}
+\makeatletter
+\newcommand*\personnummer{\expandafter\@gobbletwo\yyob\mmob\ddob-\pnlast}
+\makeatother
+\newcommand*\isodob{\yyob--\mmob--\ddob}
+\newcommand*\thedob{Date of birth: \isodob}
+\newcommand*\thepn{Personnummer: \texttt{\personnummer{}}}
+\newcommand*\themail{E-mail: \kthmail{}, \ \personalmail{} }
+
+\newcommand*\thesubtitle{Homework 1 -- The 8 queens problem}
+\author{\fullname}
+\title{\thiscourse{} \thisreport{} -- \thisprogram{} \thisperiod{}}
+\date{\today}
+
+\newcommand*\phylologo{ %
+    \includegraphics[width = 0.95\paperwidth, height = \paperheight, keepaspectratio]{phylolines} %
+}
+\newcommand*\logo{\phylologo}
+
+\backgroundsetup{
+    pages=some,
+    angle=0,
+    scale=1,
+    opacity=.1,
+    position={current page.center},
+    vshift=-6.5cm,
+    color=black,
+    contents={ \logo },
+}
+
+\newcommand*\undefbg{\backgroundsetup{pages=some,contents={}}}
+
+\newenvironment{logotitlepage}
+    { %
+        \titlegeometry
+        \begin{titlepage}
+        \thispagestyle{empty}
+        \BgThispage
+        \begin{spacing}{2}
+    }
+    { %
+        \end{spacing}
+        \end{titlepage}
+    }
+
+\newcommand*\makemytitle{ %
+    \begin{logotitlepage}
+        \begin{center}
+            \makebox[\textwidth][c]{\huge \thetitle}
+			\par
+			{\LARGE \thesubtitle}
+            \par
+            \thedate
+        \end{center}
+
+        \vfill
+
+        \textsc{\theauthor} \par
+        \thedob \par
+        \thepn \par
+        \themail
+    \end{logotitlepage}
+    \restoregeometry
+    \undefbg
+}
+
+
+% -------- DOCUMENT -------
+
+\begin{document}
+
+\makemytitle
+
+\newpage
+\section{Compilation and usage}
+The program can be compiled with \code{gcc -fopenmp queens.c} on relatively modern platforms
+(tested on \code{gcc 10.2.0} and \code{glibc 2.32}),
+and with \code{gcc -std=gnu99 -fopenmp -lrt queens.c} on more dated systems
+(working on \code{gcc 4.4.7} and \code{glibc 2.12}).
+The executable takes one optional command line argument, the number of worker threads to use;
+if given, it must be a positive integer, values greater than the maximum (currently 32) are clamped.
+If not given, it defaults to 1.
+
+The solutions to the 8 queens problem are displayed graphically, using ANSI color escape sequences
+to draw a chessboard and the UTF-8 encoded Unicode character \code{U+2655} ({\notosym ♕}) to represent the position of the
+queens; thus, on terminals not supporting a 256 color palette, ANSI escape sequences, UTF-8 text, or
+Unicode-capable fonts, the results will probably be disappointing. Go and update your system,
+please.
+
+\section{Implementation}
+\subsection{Algorithm}
+The algorithm used to find solutions is straightforward:
+I generate all possible ways of placing one queen per row on a chessboard, inspect them,
+and discard those which have at least two queens on the same column or diagonal,
+outputting those that don't.
+
+\subsection{Parallelism}
+In order to parallelize the program,
+I split the loop iterating over all queen placements over multiple threads,
+with a \omp{parallel for} directive. When a solution is found,
+a thread is spawned (with \omp{task}) to handle outputting the solution;
+the thread syncronizes with other output threads with a \omp{critical} directive.
+
+The source code should -- hopefully -- be comprehensively commented,
+should the reader wish a more precise description of its workings.
+
+\section{Performance}
+I ran benchmarks on my machine and one of KTH's shell servers,
+executing the program repeatedly ($\approx$100 times) with a worker thread count from 1 to 32.
+The results are reported in \fig{perf}, together with the results from the \code{pthreads}
+implementation.
+
+\vspace{-0.1cm}
+\begin{figure}[hb]
+	\centering
+	\includegraphics*[keepaspectratio,width=\textwidth,height=6.3cm,trim=0 0 0 1cm]{../perf/bigraph}
+	\caption{Performance scaling\label{fig:perf}}
+\end{figure}
+
+\end{document}
+

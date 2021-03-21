@@ -1,0 +1,9 @@
+perf/data
+report/*.aux
+report/*.out
+report/*.log
+report/*.pdf
+build
+multi-*
+single-*
+
