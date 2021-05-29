@@ -12,7 +12,7 @@ fi
 
 bodies="120 180 240"
 
-function doruns {
+doruns () {
 	cmd=$1
 	prefix=$2
 	echo "starting $runs runs of \`$cmd\`" >&2
@@ -26,22 +26,22 @@ function doruns {
 	echo "" >&2
 }
 
-function testprog {
+testprog () {
 	progname=$1
-	bodies=$2
-	args="$bodies $steps"
+	thebodies=$2
+	args="$thebodies $steps"
 	if [ "$progname" = "barneshut" ]; then
 		args="$args $far"
 	fi
-	prefix="single $bodies"
+	prefix="single $thebodies"
 	doruns "./single-$progname $args" "$prefix"
 	for threads in $(seq $max_t); do
-		prefix="$threads $bodies"
+		prefix="$threads $thebodies"
 		doruns "./multi-$progname $args $threads" "$prefix"
 	done
 }
 
-for prog in {quadratic,barneshut}; do
+for prog in "quadratic" "barneshut"; do
 	outfile="perf/data/$(hostname)-${prog}"
 	echo "doing $prog, will do bodies = ($bodies)" >&2
 	thebodies=$bodies

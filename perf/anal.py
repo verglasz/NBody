@@ -6,53 +6,56 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from collections import defaultdict
+
+THREADS_PLOTTED = 5
 
 def read_data(file):
-    data = [[] for _ in range(32)]
+    data = defaultdict(lambda: defaultdict(list))
     with open(file) as f:
         for line in f:
-            threads, time = line.split()
-            threads, time = int(threads), float(time)
-            data[threads - 1].append(time)
-    return [np.array(times) for times in data]
+            threads, bodies, time = line.split()
+            bodies, time = int(bodies), float(time)
+            data[threads][bodies].append(time)
+    return data
 
-def stats(data):
-    avgs = np.array([np.average(t) for t in data])
-    vars = np.array([np.var(t,ddof=1) for t in data])
-    invtime = 1/avgs
-    error = np.sqrt(vars) * invtime ** 2
-    return invtime, error
+def process(data):
+    data["0"] = data["single"]
+    del data["single"]
+    newdata = [None] * len(data)
+    for n,d in data.items():
+        newdata[int(n)] = {k: median(v) for k,v in d.items()}
+    print(newdata)
+    return newdata
 
-def plot_stats(ax, stats, **kwargs):
-    y, dy = stats['data']
-    name, cores, threads = stats['cpu']
-    linecol, vertcol = stats['colors']
-    x = range(1,len(y)+1)
-    if old:
-        props = {
-            'c': vertcol,
-            'elinewidth': 0.8,
-            'linewidth': 0.5,
-        }
+def median(list_):
+    list_ = sorted(list_)
+    l = len(list_)
+    if l % 2 == 1:
+        return list_[l//2]
     else:
+        return 0.5 * (list_[l//2] + list_[l//2 - 1])
+
+def single_plot(ax, info, **kwargs):
+    for t,result in enumerate(info[:THREADS_PLOTTED]):
+        x = []
+        y = []
+        for bodies,time in result.items():
+            x.append(bodies)
+            y.append(time)
+
         props = {
-            'c': linecol,
-            'elinewidth': 1.5,
-            'linewidth': 1,
+            # 'elinewidth': 1.5,
+            'linewidth': 0.8,
+            'markersize': 1.2,
+            'linestyle': '-',
+            'marker': 'o',
+            'markeredgewidth': 0,
         }
-    props.update({
-        'fmt': '.-',
-        'markeredgewidth': 0,
-        'markeredgecolor': vertcol,
-    }, **kwargs)
-    eb, *_ = ax.errorbar(x, y, dy, **props)
-    if old:
-        eb.set_label(f'{name}: pthreads')
-    else:
-        eb.set_label(f'{name}: {cores} cores, {threads} threads')
-        coreline = ax.axvline(cores, ls='-.', c=vertcol, lw=0.6, zorder=-1)
-        if threads != cores:
-            threadline = ax.axvline(threads, ls='-.', c=vertcol, lw=0.6, zorder=-1)
+        props.update(kwargs)
+        g, *_ = ax.plot(x, y, **props)
+        threading = f"OpenMP, {t} threads" if t else "Singlethreaded"
+        g.set_label(threading)
 
 
 mycpu = ('Ryzen 5600', 6, 12)
@@ -62,23 +65,23 @@ me = ('boron', mycpu, 'tab:green', 'limegreen')
 srv = ('subway.sys.ict.kth.se', servercpu, 'tab:blue', 'tab:cyan')
 
 def anal(*sources):
-    fig = plt.figure(dpi=600,figsize=(8,4))
-    ax = fig.add_subplot()
     for s in sources:
+        fig = plt.figure(dpi=600,figsize=(8,9))
         file, cpu, *colors = s
-        meme = {
-            'data': stats(read_data(file)),
-            'cpu': cpu,
-            'colors': colors
-        }
-        plot_stats(ax, meme)
-    ax.legend(labelcolor='linecolor', framealpha=0.9)
-    ax.set_ylabel('Runs per second')
-    ax.set_xlabel('Worker threads')
-    ax.set_xlim((0,33))
-    ax.set_ylim((0,18))
-    fig.show()
-    fig.savefig(sys.argv[1],bbox='tight')
+        title = '{0}, {1} cores, {2} threads'.format(*cpu)
+        # fig.suptitle(title)
+        axes = fig.subplots(2, sharex=True)
+        axes[1].set_xlabel('Number of bodies')
+        for ax ,prog in zip(axes, ('quadratic', 'barneshut')):
+            info = process(read_data(f'data/{file}-{prog}'))
+            single_plot(ax, info)
+            ax.legend(labelcolor='linecolor', framealpha=0.9)
+            ax.set_ylabel('Running time (s)')
+            ax.set_title(prog)
+            # ax.set_xlim((0,250))
+            ax.set_ylim((0,None))
+        fig.show()
+        fig.savefig(f'{file}.pdf',bbox='tight')
     input()
 
 if __name__ == '__main__':

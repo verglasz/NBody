@@ -30,7 +30,7 @@ else
 bench: CFLAGS += -DRAND_SEED=42
 endif
 
-bench: cleanall perf/bench.sh perf/data
+bench: clean perf/bench.sh perf/data
 	$(MAKE) all
 
 
