@@ -95,6 +95,15 @@
 
 % --------- UTILITY MACROS --------
 
+
+\newcommand*\bigo[1]{\(\mathcal{O}\left(#1\right)\)}
+\newcommand\bh{Barnes-Hut}
+\newcommand\theomp{OpenMP}
+\newcommand\posix{POSIX}
+\newcommand*\versor[1]{\hat{#1}}
+\newcommand\cfile{}
+\newcommand\makefile{Makefile}
+
 \newcommand\comment[1]{\relax}
 \newcommand*\mailto[1]{\href{mailto:#1}{\nolinkurl{#1}}}
 
@@ -173,7 +182,7 @@
 \newcommand*\thepn{Personnummer: \texttt{\personnummer{}}}
 \newcommand*\themail{E-mail: \kthmail{}, \ \personalmail{} }
 
-\newcommand*\thesubtitle{Homework 1 -- The 8 queens problem}
+\newcommand*\thesubtitle{An efficient parallel gravitational N-body simulation}
 \author{\fullname}
 \title{\thiscourse{} \thisreport{} -- \thisprogram{} \thisperiod{}}
 \date{\today}
@@ -222,7 +231,7 @@
         \vfill
 
         \textsc{\theauthor} \par
-        \thedob \par
+        % \thedob \par
         \thepn \par
         \themail
     \end{logotitlepage}
@@ -238,50 +247,66 @@
 \makemytitle
 
 \newpage
-\section{Compilation and usage}
-The program can be compiled with \code{gcc -fopenmp queens.c} on relatively modern platforms
-(tested on \code{gcc 10.2.0} and \code{glibc 2.32}),
-and with \code{gcc -std=gnu99 -fopenmp -lrt queens.c} on more dated systems
-(working on \code{gcc 4.4.7} and \code{glibc 2.12}).
-The executable takes one optional command line argument, the number of worker threads to use;
-if given, it must be a positive integer, values greater than the maximum (currently 32) are clamped.
-If not given, it defaults to 1.
 
-The solutions to the 8 queens problem are displayed graphically, using ANSI color escape sequences
-to draw a chessboard and the UTF-8 encoded Unicode character \code{U+2655} ({\notosym ♕}) to represent the position of the
-queens; thus, on terminals not supporting a 256 color palette, ANSI escape sequences, UTF-8 text, or
-Unicode-capable fonts, the results will probably be disappointing. Go and update your system,
-please.
+\begin{abstract}
+	I implement a parallel gravitational N-body simulator using two algorithms:
+	a precise and trivial \bigo{N^2} one and the \bh{} algorithm (an \bigo{n \log n} approximation).
 
-\section{Implementation}
-\subsection{Algorithm}
-The algorithm used to find solutions is straightforward:
-I generate all possible ways of placing one queen per row on a chessboard, inspect them,
-and discard those which have at least two queens on the same column or diagonal,
-outputting those that don't.
+	Both approaches are implemented with \theomp{} multithreading, and thus can also be compiled into
+	single-treaded executables.
 
-\subsection{Parallelism}
-In order to parallelize the program,
-I split the loop iterating over all queen placements over multiple threads,
-with a \omp{parallel for} directive. When a solution is found,
-a thread is spawned (with \omp{task}) to handle outputting the solution;
-the thread syncronizes with other output threads with a \omp{critical} directive.
+	Performance for the two algorithms in both single- and multi-threaded mode is recorded with a
+	variety of different parameters and analyzed.
+\end{abstract}
 
-The source code should -- hopefully -- be comprehensively commented,
-should the reader wish a more precise description of its workings.
+\section{Compilation and execution}
+
+The software only relies on the C standard library and \theomp{}, and is compiled with (GNU) Make.
+A \posix{} shell script is used to launch the different executables with different options repeatedly and record performance;
+a Python script analizes the data and plots it.
+
+\section{Algorithm}
+The most straightforward way to implement a gravitational simulation is computing the net acceleration
+on each object and using it to update its velocity, then using the objects' velocity to update their
+position, with every such step representing an equal amount of time elapsed. This was the approach
+taken in both implementations.
+
+To calculate the net acceleration on each body, a na\"ive approach is to iterate through the full
+list of bodies and sum up all their contributions to the total force, using Newton's law of
+gravitaiton:
+\[
+	\vec{F}_{12} = -G \frac{m_1 m_2}{d_{12}^2} \versor{d}_{12}
+\]
+With this approach, every time step of the simulation has \bigo{N^2} time complexity,
+where $N$ is the number of bodies. We implemented this in \code{quadratic.c}.
+
+A more sophisticated algorithm is the \bh{} algorithm: at every time step, the bodies are inserted
+as leaves in a tree (a quadtree for 2D simulations, or an octree for 3D ones) based on their spatial
+positions; every internal node mantains data about the total mass of its descendant bodies (leaves)
+and their center of mass. To then compute the gravitational acceleration on an object,
+the tree is traversed from the root up to nodes whose center of mass
+(i.e., the center of mass of the bodies contained in the corresponding subtree)
+is ``sufficiently far'', descending until the leaves if necessary.
 
 \section{Performance}
-I ran benchmarks on my machine and one of KTH's shell servers,
-executing the program repeatedly ($\approx$100 times) with a worker thread count from 1 to 32.
-The results are reported in \fig{perf}, together with the results from the \code{pthreads}
-implementation.
 
-\vspace{-0.1cm}
-\begin{figure}[hb]
-	\centering
-	\includegraphics*[keepaspectratio,width=\textwidth,height=6.3cm,trim=0 0 0 1cm]{../perf/bigraph}
-	\caption{Performance scaling\label{fig:perf}}
-\end{figure}
+\appendix
+
+\section{Makefile}
+\makefile{}
+
+\section{Source code}
+\subsection{barneshut.c}
+\cfile{barneshut.c}
+
+\subsection{quadratic.c}
+\cfile{quadratic.c}
+
+\subsection{common.c}
+\cfile{common.c}
+
+\subsection{gravity.c}
+\cfile{gravity.c}
 
 \end{document}
 
