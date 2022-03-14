@@ -17,6 +17,8 @@
 \usepackage{microtype}
 \usepackage{titling}
 \usepackage{titlesec}
+\usepackage[outputdir=report]{minted}
+\usepackage{underscore}
 \usepackage{background}
 \usepackage{graphicx}
 \usepackage{caption}
@@ -26,6 +28,8 @@
 \usepackage{tikz}
 
 % ----- OPTION SETUP -----
+
+\newminted{c}{gobble=0,tabsize=4, breaklines}
 
 \setmainfont{EB Garamond}
 \setsansfont{Gill Sans MT Book}
@@ -91,12 +95,12 @@
     urlcolor = [RGB]{120, 29, 29},
 }
 
-\graphicspath{ {/home/verglasz/media/images/logos} }
+\graphicspath{ {/home/verglasz/v/media/images/logos} }
 
 % --------- UTILITY MACROS --------
 
 
-\newcommand*\bigo[1]{\(\mathcal{O}\left(#1\right)\)}
+\newcommand*\bigo[1]{\(\mathcal{O}\!\left(#1\right)\)}
 \newcommand\bh{Barnes-Hut}
 \newcommand\theomp{OpenMP}
 \newcommand\posix{POSIX}
@@ -104,7 +108,7 @@
 \newcommand\cfile{}
 \newcommand\makefile{Makefile}
 
-\newcommand\comment[1]{\relax}
+\newcommand\acomment[1]{\relax}
 \newcommand*\mailto[1]{\href{mailto:#1}{\nolinkurl{#1}}}
 
 \definecolor{CodeBG}{RGB}{27,31,35}
@@ -247,10 +251,10 @@
 \makemytitle
 
 \newpage
-
 \begin{abstract}
-	I implement a parallel gravitational N-body simulator using two algorithms:
-	a precise and trivial \bigo{N^2} one and the \bh{} algorithm (an \bigo{n \log n} approximation).
+	I implement in C a parallel gravitational N-body simulator using two algorithms:
+	a trivial \bigo{N^2} one and the \bh{} algorithm (an \bigo{N \log N} solution
+	involving some approximations).
 
 	Both approaches are implemented with \theomp{} multithreading, and thus can also be compiled into
 	single-treaded executables.
@@ -259,13 +263,21 @@
 	variety of different parameters and analyzed.
 \end{abstract}
 
-\section{Compilation and execution}
+\section{Overview}
 
-The software only relies on the C standard library and \theomp{}, and is compiled with (GNU) Make.
-A \posix{} shell script is used to launch the different executables with different options repeatedly and record performance;
-a Python script analizes the data and plots it.
+\subsection{Compilation and execution}
 
-\section{Algorithm}
+The software only relies on the C standard library and \theomp{}, it is compiled with gcc
+(although it should be portable to other compilers) and GNU Make is used to orchestrate the build.
+I used a \posix{} shell script to launch the different
+executables with different options repeatedly and record performance;
+before analyzing the produced data with a Python script.
+
+For each of the two implementations, two executables are generated, one compiled with
+\code{-fopenmp} and the other without (using macros to turn \theomp{} function calls into
+empty blocks).
+
+\subsection{Algorithms}
 The most straightforward way to implement a gravitational simulation is computing the net acceleration
 on each object and using it to update its velocity, then using the objects' velocity to update their
 position, with every such step representing an equal amount of time elapsed. This was the approach
@@ -278,35 +290,336 @@ gravitaiton:
 	\vec{F}_{12} = -G \frac{m_1 m_2}{d_{12}^2} \versor{d}_{12}
 \]
 With this approach, every time step of the simulation has \bigo{N^2} time complexity,
-where $N$ is the number of bodies. We implemented this in \code{quadratic.c}.
+where $N$ is the number of bodies. I implemented this in \code{quadratic.c}.
 
-A more sophisticated algorithm is the \bh{} algorithm: at every time step, the bodies are inserted
-as leaves in a tree (a quadtree for 2D simulations, or an octree for 3D ones) based on their spatial
-positions; every internal node mantains data about the total mass of its descendant bodies (leaves)
+A more sophisticated algorithm is the \bh{} algorithm: at every time step,
+the bodies are inserted as leaves in a tree
+(a quadtree for 2D simulations, or an octree for 3D ones like the one I implemented)
+based on their spatial positions;
+every internal node mantains data about the total mass of its descendant bodies (leaves)
 and their center of mass. To then compute the gravitational acceleration on an object,
 the tree is traversed from the root up to nodes whose center of mass
 (i.e., the center of mass of the bodies contained in the corresponding subtree)
-is ``sufficiently far'', descending until the leaves if necessary.
+is ``sufficiently far'', descending until the leaves if necessary,
+and adding up the gravitational acceleration given by the whole node taken as a point mass.
+
+The implementation is in \code{barneshut.c}.
+
+\subsection{General approach}
+
+The \code{grav.h} and \code{grav.c} files define the types used to represent the data
+(a \code{Vec3} struct for 3-dimensional vectors,
+used for positions, velocities, and accelerations,
+and a \code{Body} struct holding position, velocity, and mass of the celestial bodies
+we're simulating), and functions to operate on them, implementing some vector operations
+and the calculation of the gravitational acceleration from a source at a given point in space.
+
+\section{Quadratic algorithm}
+
+This solution is embarassingly parallel,
+with both computing accelerations and updating positions and velocities
+being trivial to distribute across threads:
+
+\begin{ccode}
+void simulation_step(Body bodies[], int num_bodies, Acceleration accels[]) {
+#pragma omp parallel for
+	for (int i=0; i<num_bodies; i++) {
+		accels[i] = get_total_accel(i, bodies, num_bodies);
+	}
+#pragma omp parallel for
+	for (int i=0; i<num_bodies; i++) {
+		Body * b = &bodies[i];
+		vec_accumulate(&b->pos, b->vel);
+		vec_accumulate(&b->vel, accels[i]);
+	}
+}
+\end{ccode}
+
+The price of this simplicity is the nested ($N^2$) loop, as \code{get_total_accel}
+also iterates over all bodies:
+
+\begin{ccode}
+Acceleration get_total_accel(int current, const Body bodies[], int num_bodies) {
+	Acceleration total = {0, 0, 0};
+	for (int i=0; i<num_bodies; i++) {
+		if (i != current && body_is_in_bounds(&bodies[i])) {
+			Acceleration a = gravitational_acc(
+				bodies[current].pos,
+				bodies[i].pos,
+				bodies[i].mass
+			);
+			vec_accumulate(&total, a);
+		}
+	}
+	return total;
+}
+\end{ccode}
+
+Running the simulation simply consists of calling \code{simulation_step} repeatedly
+for the desired number of iterations.
+
+\section{\bh}
+
+The \bh{} algorithm also allows for a great deal of easy parallelism:
+
+\begin{ccode}
+void simulation_step(BHTree * tree, Body bodies[], int num_bodies, Acceleration accels[], double far_threshold) {
+	fill_tree(tree, bodies, num_bodies);
+#pragma omp parallel for
+	for (int i=0; i<num_bodies; i++) {
+		accels[i] = get_total_accel(&bodies[i], tree, far_threshold);
+	}
+#pragma omp parallel for
+	for (int i=0; i<num_bodies; i++) {
+		evolve_body(&bodies[i], &accels[i]);
+	}
+}
+\end{ccode}
+
+The difference is that, before our acceleration calculation, we need to build the \bh{} tree,
+which requires inserting the bodies one by one, so to parallelize this step
+we need to find a way to update this nontrivial data structure concurrently without
+data races.
+
+Ultimately, I chose to guard the children of the root node with a mutex,
+allowing concurrent access only to different octants;
+as long as the simulated bodies aren't confined to a small section of the
+simulated area, this approach should scale well up to 8 hardware threads (and it would be
+simple to extend it to the first two levels of the tree to scale up to 64 hardware threads)
+and has little synchronization overhead (just a single locking/unlocking per insertion in the tree):
+
+\begin{ccode}
+void fill_tree(BHTree * tree, Body bodies[], int num_bodies) {
+	zero_tree(tree);
+	for (int i=0; i<num_bodies; i++) {
+		Body * b = &bodies[i];
+		if (body_is_in_bounds(b)) {
+			root_insert_body(tree, b);
+		}
+	}
+	rescale_tree(tree);
+}
+
+void root_insert_body(BHTree *tree, const Body * body) {
+	int idx = octree_idx(&tree->center, &body->pos);
+	NodeBuffer *octant = &tree->octants[idx];
+#pragma omp task
+	{
+		omp_set_lock(&tree_locks[idx]);
+		insert_body(0, body, octant);
+		omp_unset_lock(&tree_locks[idx]);
+	}
+}
+\end{ccode}
+
+\subsection{Representing the tree}
+
+The tree is thus divided into octants:
+every octant stores a resizable array of nodes, which will be populated as we
+fill nodes in this octant with bodies (essentially using it as an allocation arena),
+with the element at index 0 representing the root of the octant
+(i.e., the child node of the root of the whole tree corresponding to this octant).
+
+The struct representing the tree stores the octants
+and the description of the space covered by our simulation
+(which is \pm\code{halfsize} in every direction from \code{center}):
+
+\begin{ccode}
+typedef struct nodebuffer_struct {
+	BHNode * nodes;
+	int capacity;
+	int next_free;
+} NodeBuffer;
+
+typedef struct bhtree_struct {
+	Position center;
+	double halfsize;
+	NodeBuffer octants[8];
+} BHTree;
+\end{ccode}
+
+The nodes of the tree are represented with this struct:
+
+\begin{ccode}
+typedef enum childtype_enum {EMPTY, BODY, NODE} ChildType;
+
+typedef struct bhnode_child {
+	enum childtype_enum type;
+	union {
+		int node_idx;
+		const Body * body;
+	};
+} BHChild;
+
+typedef struct bhnode_struct {
+	Position midpoint;
+	double halfsize;
+	double mass;
+	Position center_of_mass;
+	BHChild children[8];
+} BHNode;
+\end{ccode}
+
+They represent a cubical chunk of space centered in \code{midpoint}
+and spanning \pm\code{halfsize} in all three coordinates,
+and we keep track of the center of mass and total mass of the bodies
+contained within this volume; every node has 8 children
+(one per octant of the space covered by this node)
+which can either be empty
+(if nothing is present in that sector of the node), other nodes, or single bodies.
+
+Bodies are stored as pointer (which will point into the array of all bodies),
+while nodes are stored as indices into the octant's backing storage.
+
+Storing indices requires more indirection,
+but if we stored pointers to nodes then we could never
+resize the array of nodes, so unless we preallocate a huge array we could risk
+running out of space,
+and if we allocated every node individually as we create them
+we'd pay the cost of all those many calls to \code{malloc} (and subsequent \code{free})
+for every simulation step.
+
+\subsection{Inserting bodies}
+
+To insert a body in the octant, we descend into the octree until we find either an empty leaf,
+in which case we insert the body there and we're done, or a body leaf, in which case we have to
+create a new child node (by appropriately inizializing an unused element of the
+octant's store of nodes, growing it if necessary) to push the found body to,
+then descending into it again to try to insert our body
+(if it doesn't occupy the same octant of the node,
+it will find a fresh empty child to slide into).
+
+\begin{ccode}
+void insert_body(int current_node, const Body * body, NodeBuffer * buffer) {
+	BHNode * current = &buffer->nodes[current_node];
+	update_node_with_body(current, body);
+	int idx = octree_idx(&current->midpoint, &body->pos);
+	insert_body_in_child(current_node, idx, body, buffer);
+}
+
+void insert_body_in_child(int parent_node, int idx, const Body *body, NodeBuffer * buffer) {
+	BHChild * child = &buffer->nodes[parent_node].children[idx];
+	int next;
+	switch (child->type) {
+	case EMPTY:
+		child->type = BODY;
+		child->body = body;
+		break;
+	case BODY:
+		// may move the backing store in the buffer,
+		// so the child pointer is invalid after this
+		// (and node_idx can't be cached since
+		// it's going to be changed by push_down_child)
+		push_down_child(parent_node, idx, buffer);
+		// FALLTHROUGH
+	case NODE:
+		// getting `next` from all-fresh data
+		next = buffer->nodes[parent_node].children[idx].node_idx;
+		insert_body(next, body, buffer);
+		break;
+	}
+}
+\end{ccode}
+
+As we insert bodies,
+we accumulate their mass in all the nodes from the root to their leaf,
+and also accumulate the quantity $position \cdot mass$, which we will
+at the end of all insertions divide by the total mass to obtain the center
+of mass of the node:
+
+\begin{ccode}
+void update_node_with_body(BHNode *node, const Body * body) {
+	node->mass += body->mass;
+	Position addcm = body->pos;
+	vec_rescale(&addcm, body->mass);
+	vec_accumulate(&node->center_of_mass, addcm);
+}
+\end{ccode}
+
+\subsection{Solving dynamics quickly}
+
+Once we're done building our tree, we can finally tackle the problem of how
+to calculate the total gravitational acceleration on a body without having to
+go through every other body. In \bh{}, this is achieved by approximating the influence
+of every node of the tree that is sufficiently far from the body under consideration
+as that of a single object of mass equal to the total mass in the node and positioned
+at the center of mass of the node
+(thus grouping all the bodies contained within it in a single point mass):
+
+\begin{ccode}
+Acceleration get_accel_from_node(const Body * on, const BHNode * node, const NodeBuffer * buffer, double far_threshold) {
+	double distance = length(vec_diff(node->center_of_mass, on->pos));
+	double width = 2 * node->halfsize;
+	bool is_far = distance/width > far_threshold;
+	if (is_far) {
+		return gravitational_acc(on->pos, node->center_of_mass, node->mass);
+	} else {
+		Acceleration total = {0., 0., 0.};
+		for (int i=0; i<8; i++) {
+			const BHChild * child = &node->children[i];
+			Acceleration a = get_accel_from_child(on, child, buffer, far_threshold);
+			vec_accumulate(&total, a);
+		}
+		return total;
+	}
+\end{ccode}
+
+A node is considered to be far enough for this approximation to apply if
+the ratio of the distance to the body and the length of the side of the cubical
+volume of space covered by the node is above a certain threshold,
+given as a CLI parameter when invoking the program.
+
+This means that (as long as the threshold isn't too high)
+for most of the volume covered by the simulation,
+we can stop far short of reaching the leaves,
+thus visiting a number of nodes far lower than the number of bodies
+(logarithmic on average).
 
 \section{Performance}
 
-\appendix
+I ran the programs with randomly generated celestial bodies for many steps and recorded
+the time required to complete execution, the results for my machine (with a modern 6-cores 12-threads
+Ryzen processor) can be seen in \fig{homeperf}
+while \fig{servperf} reports the results of executing the programs on one of KTH's shell servers
+(sporting older dual 12-core Opterons, for a total of 24 cores and 24 threads).
 
-\section{Makefile}
-\makefile{}
+We can definitely see the quadratic scaling of the na\"ive algorithm,
+and how \bh{}'s performance dominates (all runs used a threshold for far nodes of 1.2);
+we can also see solid gains from parallelization with both algorithms,
+but also that on my machine the \bh{} version essentially scales up to
+the number of cores, while on KTH's server its performance peters out,
+likely due to the aforementioned limitations of the chosen method
+of parallelizing the tree-building step.
 
-\section{Source code}
-\subsection{barneshut.c}
-\cfile{barneshut.c}
+\begin{figure}[hp]
+	\centering
+	\includegraphics*[keepaspectratio,width=\textwidth,trim=0 1.0cm 0.0cm 1.0cm, clip]{perf/boron}
+	\caption{Runtime for \num{500000} simulation steps on my machine\label{fig:homeperf}}
+\end{figure}
 
-\subsection{quadratic.c}
-\cfile{quadratic.c}
+\begin{figure}[hp]
+	\centering
+	\includegraphics*[keepaspectratio,width=\textwidth,trim=0 1.0cm 0.0cm 1.0cm, clip]{perf/subway.sys.ict.kth.se}
+	\caption{Runtime for \num{60000} simulation steps on a KTH server\label{fig:servperf}}
+\end{figure}
 
-\subsection{common.c}
-\cfile{common.c}
+\section{Conclusions}
 
-\subsection{gravity.c}
-\cfile{gravity.c}
+Overall I feel this project has been quite interesting,
+and lead me to consider a number of design decisions from multiple angles
+before settling on the solutions;
+some of those decisions I still have doubts about
+(perhaps there is a more elegant way of parallelizing the tree-building step?),
+and if I had more time I'd have liked to experiment with different approaces
+(for example, maybe a more data-oriented design,
+storing positions and velocities and masses of bodies in separate contiguous arrays
+instead of grouping them per-body, would have allowed for better performance due to
+the possibility for vectorization, either through compiler optimizations or manually
+invoking the SIMD intrinsics available on modern CPUs).
+
+I also started working on an OpenGL visualization of the simulation,
+but couldn't complete it in time; perhaps the assignment could suggest some
+libraries to take care of the graphical plumbing.
 
 \end{document}
 
