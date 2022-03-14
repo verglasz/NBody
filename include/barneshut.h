@@ -16,8 +16,6 @@ typedef struct {
 
 typedef enum childtype_enum {EMPTY, BODY, NODE} ChildType;
 
-struct bhnode_struct;
-
 typedef struct bhnode_child {
 	enum childtype_enum type;
 	union {

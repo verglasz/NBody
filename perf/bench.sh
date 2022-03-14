@@ -10,7 +10,7 @@ else
 	steps=60000
 fi
 
-bodies="120 180 240"
+bodies=$(seq 60 60 600)
 
 doruns () {
 	cmd=$1
@@ -44,10 +44,9 @@ testprog () {
 for prog in "quadratic" "barneshut"; do
 	outfile="perf/data/$(hostname)-${prog}"
 	echo "doing $prog, will do bodies = ($bodies)" >&2
-	thebodies=$bodies
-	for b in $thebodies; do
+	for b in $bodies; do
 		echo $prog with $b >&2
-		testprog $prog $b >> $outfile
+		testprog "$prog" $b >> $outfile
 	done
 done
 

@@ -33,6 +33,12 @@ endif
 bench: clean perf/bench.sh perf/data
 	$(MAKE) all
 
+report: $(TEXDIR)/report.pdf
+
+objs: $(OBJECTS)  $(OBJDIR)/multi-quadratic.o  $(OBJDIR)/single-quadratic.o $(OBJDIR)/single-barneshut.o $(OBJDIR)/multi-barneshut.o
+
+$(TEXDIR)/%.pdf: $(TEXDIR)/%.tex
+	lualatex $(TEXFLAGS) $<
 
 perf/data:
 	mkdir $@
@@ -40,8 +46,10 @@ perf/data:
 singlethreaded: CFLAGS += -Wno-unknown-pragmas
 singlethreaded: single-quadratic single-barneshut
 
+
 multithreaded: CFLAGS += -fopenmp
 multithreaded: multi-quadratic multi-barneshut
+
 
 cleanall: clean cleanbench
 	rm -rf {single,multi}-{barneshut,quadratic}
