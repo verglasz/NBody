@@ -5,14 +5,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+
 #ifdef _OPENMP
-	#include <omp.h>
-	#define NUM_ARGS 3
-	#define WORKER_ARG " <workers>"
+# include <omp.h>
+# define NUM_ARGS 3
+# define WORKER_ARG " <workers>"
 #else
-	#define omp_set_num_threads(...)
-	#define NUM_ARGS 2
-	#define WORKER_ARG
+# define omp_set_num_threads(...)
+# define NUM_ARGS 2
+# define WORKER_ARG
 #endif
 
 const char ARGHELP[] = "<bodies> <steps>" WORKER_ARG;

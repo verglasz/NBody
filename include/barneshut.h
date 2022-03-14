@@ -19,8 +19,8 @@ typedef enum childtype_enum {EMPTY, BODY, NODE} ChildType;
 typedef struct bhnode_child {
 	enum childtype_enum type;
 	union {
-		int node_idx;
 		const Body * body;
+		int node_idx;
 	};
 } BHChild;
 
@@ -54,7 +54,7 @@ int get_next_free(NodeBuffer * buffer);
 
 void run(int num_bodies, int steps, double far);
 void simulation_step(BHTree *tree, Body bodies[], int num_bodies, Acceleration accels[], double far_threshold);
-void evolve_body(Body * body, const Acceleration * acc);
+void evolve_body(Body * body, const Acceleration * acc, double timedelta);
 
 
 void rescale_cm(BHNode * node, const NodeBuffer * buffer);

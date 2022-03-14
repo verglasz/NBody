@@ -44,6 +44,12 @@ void vec_rescale(Vec3 * v, double scale) {
 	v->z *= scale;
 }
 
+void vec_accumulate_scaled(Vec3 * acc, Vec3 val, double scale) {
+	acc->x += val.x * scale;
+	acc->y += val.y * scale;
+	acc->z += val.z * scale;
+}
+
 
 double length(Vec3 r) {
 	double lsquared = r.x*r.x + r.y*r.y + r.z*r.z;
@@ -75,18 +81,18 @@ void init_bodies(Body bodies[], int len) {
 
 bool body_is_in_bounds(Body *body) {
 	Position * pos = &body->pos;
-	bool x = pos->x > 0. && pos->x < POS_RANGE;
-	bool y = pos->y > 0. && pos->y < POS_RANGE;
-	bool z = pos->z > 0. && pos->z < POS_RANGE;
+	bool x = pos->x > -POS_RANGE && pos->x < POS_RANGE;
+	bool y = pos->y > -POS_RANGE && pos->y < POS_RANGE;
+	bool z = pos->z > -POS_RANGE && pos->z < POS_RANGE;
 	return x && y && z;
 }
 
-Acceleration gravitational_acc(Position at, Position source, double mass) {
-	Acceleration acc;
+Acceleration gravitational_acc(Position at, Position source, double source_mass) {
 	Vec3 r = vec_diff(source, at); // r points toward source
 	double d = length(r);
 	// a small repulsive component prevents things from getting too close to each other
-	double dmodulus = G_CONSTANT * mass / (d * d * d) * (1 - REPULSIVE_DISTANCE/d);
+	double dmodulus = G_CONSTANT * source_mass / (d * d * d) * (1 - REPULSIVE_DISTANCE/d);
+	Acceleration acc;
 	acc.x = dmodulus * r.x;
 	acc.y = dmodulus * r.y;
 	acc.z = dmodulus * r.z;

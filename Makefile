@@ -2,13 +2,16 @@
 OBJDIR := build
 SOURCEDIR := src
 INCLUDEDIR := include
+SHADERDIR := shaders
 TEXDIR := report
 BENCHDIR := perf/data
 HOST := $(shell hostname)
 
 
 CC := gcc
-CFLAGS += -I$(INCLUDEDIR) -Wall -Wextra -O2 -lm
+libs := glfw GL X11 pthread Xrandr Xi dl m
+LIBS := $(libs:%=-l%)
+CFLAGS += -I$(INCLUDEDIR) -I$(SHADERDIR) -Wall -Wextra -O2 $(LIBS)
 
 TEXFLAGS := -output-directory=$(TEXDIR) -interaction=nonstopmode -shell-escape
 
@@ -17,15 +20,19 @@ CFLAGS += -lrt -std=gnu99
 endif
 
 ifneq ($(debug),)
-CFLAGS += -DDEBUG
+CFLAGS += -DDEBUG -g3
+else
+CFLAGS += -g
 endif
 
-objs := common grav
-OBJECTS := $(objs:%=$(OBJDIR)/\%-%.o)
+objs := common grav graphics glad
+OBJECTS := $(objs:%=$(OBJDIR)/%.o)
+SHADERS := $(wildcard $(SHADERDIR)/*.gl)
 
 .PHONY: singlethreaded multithreaded report bench clean cleanbench cleanall
 
 all: singlethreaded multithreaded
+
 
 #reproducibility
 ifneq ($(seed),)
@@ -74,5 +81,14 @@ $(OBJDIR)/single-%.o: $(SOURCEDIR)/%.c $(INCLUDEDIR)/%.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(OBJDIR)/multi-%.o: $(SOURCEDIR)/%.c $(INCLUDEDIR)/%.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/%.o: $(SOURCEDIR)/%.c $(INCLUDEDIR)/%.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/glad.o: $(SOURCEDIR)/glad.c $(INCLUDEDIR)/glad/glad.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/graphics.o: $(SOURCEDIR)/graphics.c $(INCLUDEDIR)/graphics.h $(SHADERS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

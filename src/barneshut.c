@@ -1,6 +1,7 @@
 
 
 #include "barneshut.h"
+#include "graphics.h"
 #include "common.h"
 #include "grav.h"
 #include <stdlib.h>
@@ -14,6 +15,8 @@
 	#define NUM_ARGS 3
 	#define WORKER_ARG
 #endif
+
+#define STEPS_PER_RENDER 100
 
 const char ARGHELP[] = "<bodies> <steps> <BH distance threshold>" WORKER_ARG;
 
@@ -33,14 +36,18 @@ void init_openmp(int num_threads) {
 #endif
 
 
+static double prev_simulation_time;
+
 int main(int argc, char ** argv) {
 	Args args;
 	if (parse_args(&args, argc-1, argv+1)) {
 		eprintf("Usage: %s %s\n", argv[0], ARGHELP);
 		return 1;
 	}
+	init_graphics(args.num_bodies);
 	init_openmp(args.workers);
     run(args.num_bodies, args.steps, args.far);
+	getchar();
 	return 0;
 }
 
@@ -80,10 +87,15 @@ void run(int num_bodies, int steps, double far_threshold) {
 	init_bodies(bodies, num_bodies);
     struct timespec start;
     struct timespec end;
+	prev_simulation_time = get_simulation_time();
+	render(bodies);
     clock_gettime(CLOCK_MONOTONIC, &start);
-	for (int i=0; i<steps; i++) {
-		simulation_step(tree, bodies, num_bodies, accels, far_threshold);
-		debug("\n---- step completed ----\n\n");
+	for (int i=0; i<steps; i+=STEPS_PER_RENDER) {
+		for (int j = 0; j<STEPS_PER_RENDER; j++) {
+			simulation_step(tree, bodies, num_bodies, accels, far_threshold);
+			debug("\n---- step completed ----\n\n");
+		}
+		render(bodies);
 	}
     clock_gettime(CLOCK_MONOTONIC, &end);
     show_elapsed_time(start, end);
@@ -123,17 +135,19 @@ void simulation_step(BHTree * tree, Body bodies[], int num_bodies, Acceleration 
 	for (int i=0; i<num_bodies; i++) {
 		accels[i] = get_total_accel(&bodies[i], tree, far_threshold);
 	}
+	double time = get_simulation_time();
+	double delta = time - prev_simulation_time;
 #pragma omp parallel for
 	for (int i=0; i<num_bodies; i++) {
-		evolve_body(&bodies[i], &accels[i]);
+		evolve_body(&bodies[i], &accels[i], delta);
 	}
+	prev_simulation_time = time;
 }
 
-void evolve_body(Body * body, const Acceleration * acc) {
-	vec_accumulate(&body->pos, body->vel);
-	vec_accumulate(&body->vel, *acc);
+void evolve_body(Body * body, const Acceleration * acc, double timedelta) {
+	vec_accumulate_scaled(&body->pos, body->vel, timedelta);
+	vec_accumulate_scaled(&body->vel, *acc, timedelta);
 }
-
 
 
 void fill_tree(BHTree * tree, Body bodies[], int num_bodies) {
@@ -228,9 +242,9 @@ void insert_body(int current_node, const Body * body, NodeBuffer * buffer) {
 
 /* may reallocate the backing store through the call to `push_down_child`
  */
-void insert_body_in_child(int parent_node, int idx, const Body *body, NodeBuffer * buffer) {
-	BHChild * child = &buffer->nodes[parent_node].children[idx];
-	int next;
+void insert_body_in_child(int parent_node, int child_idx, const Body *body, NodeBuffer * buffer) {
+	BHChild * child = &buffer->nodes[parent_node].children[child_idx];
+	int next = child->node_idx;
 	switch (child->type) {
 	case EMPTY:
 		child->type = BODY;
@@ -241,11 +255,11 @@ void insert_body_in_child(int parent_node, int idx, const Body *body, NodeBuffer
 		// so the child pointer is invalid after this
 		// (and node_idx can't be cached since
 		// it's going to be changed by push_down_child)
-		push_down_child(parent_node, idx, buffer);
+		push_down_child(parent_node, child_idx, buffer);
+		// so we get next again from all-fresh data
+		next = buffer->nodes[parent_node].children[child_idx].node_idx;
 		// FALLTHROUGH
 	case NODE:
-		// getting next from all-fresh data
-		next = buffer->nodes[parent_node].children[idx].node_idx;
 		insert_body(next, body, buffer);
 		break;
 	}
@@ -260,12 +274,12 @@ void update_node_with_body(BHNode *node, const Body * body) {
 
 /* may reallocate the backing store through the call to `get_next_free`
  */
-void push_down_child(int parent_node, int idx, NodeBuffer * buffer) {
+void push_down_child(int parent_node, int child_idx, NodeBuffer * buffer) {
 	int new_node = get_next_free(buffer);
 	BHNode * new = &buffer->nodes[new_node];
 	BHNode * parent = &buffer->nodes[parent_node];
-	init_node_relative(new, &parent->midpoint, parent->halfsize, idx);
-	BHChild * child = &parent->children[idx];
+	init_node_relative(new, &parent->midpoint, parent->halfsize, child_idx);
+	BHChild * child = &parent->children[child_idx];
 	insert_body(new_node, child->body, buffer);
 	// ^ this call won't invalidate the child pointer
 	// because it's going to be inserting in an EMPTY child
@@ -292,7 +306,7 @@ int get_next_free(NodeBuffer * buffer) {
 }
 
 
-/* Since the tree is build with mass*cm in place of the center of mass,
+/* Since the tree is built with mass*cm in place of the center of mass,
  * we rescale it at the end, dividing each node's cm value by its mass
  */
 void rescale_tree(BHTree * tree) {
@@ -301,7 +315,6 @@ void rescale_tree(BHTree * tree) {
 		NodeBuffer * octant = &tree->octants[i];
 		rescale_cm(&octant->nodes[0], octant);
 	}
-
 }
 
 void rescale_cm(BHNode * node, const NodeBuffer * buffer) {
