@@ -25,7 +25,7 @@ OBJECTS := $(objs:%=$(OBJDIR)/\%-%.o)
 
 .PHONY: singlethreaded multithreaded report bench clean cleanbench cleanall
 
-all: singlethreaded multithreaded report
+all: singlethreaded multithreaded
 
 #reproducibility
 ifneq ($(seed),)
@@ -41,6 +41,7 @@ report: $(TEXDIR)/report.pdf
 
 
 $(TEXDIR)/%.pdf: $(TEXDIR)/%.tex
+	# cd $(TEXDIR) &&
 	lualatex $(TEXFLAGS) $<
 
 perf/data:
