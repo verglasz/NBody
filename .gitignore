@@ -1,9 +1,8 @@
+*.zip
 perf/data
 perf/*.pdf
-report/*.aux
-report/*.out
-report/*.log
-report/*.pdf
+report/*
+!report/*.tex
 build
 multi-*
 single-*
