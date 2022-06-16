@@ -8,15 +8,19 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 
-THREADS_PLOTTED = 5
+THREADS_PLOTTED = list(range(7)) + [8, 10, 12, 16, 20]
 
 def read_data(file):
     data = defaultdict(lambda: defaultdict(list))
     with open(file) as f:
         for line in f:
-            threads, bodies, time = line.split()
+            try:
+                threads, bodies, time = line.split()
+            except ValueError:
+                continue
             bodies, time = int(bodies), float(time)
             data[threads][bodies].append(time)
+    # print(file, data)
     return data
 
 def process(data):
@@ -25,7 +29,7 @@ def process(data):
     newdata = [None] * len(data)
     for n,d in data.items():
         newdata[int(n)] = {k: median(v) for k,v in d.items()}
-    print(newdata)
+    # print(newdata)
     return newdata
 
 def median(list_):
@@ -37,10 +41,13 @@ def median(list_):
         return 0.5 * (list_[l//2] + list_[l//2 - 1])
 
 def single_plot(ax, info, **kwargs):
-    for t,result in enumerate(info[:THREADS_PLOTTED]):
+    for t in THREADS_PLOTTED:
+        if t >= len(info):
+            continue
+        result = info[t]
         x = []
         y = []
-        for bodies,time in result.items():
+        for bodies,time in sorted(result.items()):
             x.append(bodies)
             y.append(time)
 
