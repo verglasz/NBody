@@ -2,11 +2,15 @@
 OBJDIR := build
 SOURCEDIR := src
 INCLUDEDIR := include
+TEXDIR := report
 BENCHDIR := perf/data
 HOST := $(shell hostname)
 
+
 CC := gcc
 CFLAGS += -I$(INCLUDEDIR) -Wall -Wextra -O2 -lm
+
+TEXFLAGS := -output-directory=$(TEXDIR) -interaction=nonstopmode -shell-escape
 
 ifneq ($(HOST),boron)
 CFLAGS += -lrt -std=gnu99
@@ -19,7 +23,7 @@ endif
 objs := common grav
 OBJECTS := $(objs:%=$(OBJDIR)/\%-%.o)
 
-.PHONY: singlethreaded multithreaded bench clean cleanbench cleanall
+.PHONY: singlethreaded multithreaded report bench clean cleanbench cleanall
 
 all: singlethreaded multithreaded
 
