@@ -11,7 +11,7 @@
 
 const double MASS_MIN = 1;
 const double MASS_RANGE = 50;
-const double REPULSIVE_DISTANCE = 1e-4 * POS_RANGE;
+const double REPULSIVE_DISTANCE = 1e-10 * POS_RANGE;
 
 const double G_CONSTANT = 6.6743e-11;
 
@@ -50,15 +50,21 @@ double length(Vec3 r) {
 	return sqrt(lsquared);
 }
 
-void init_body(Body *b) {
-	b->mass = MASS_MIN + MASS_RANGE / RAND_MAX * random();
-	b->vel.x = 1e-2 * (1. - 2. / RAND_MAX * random());
-	b->vel.y = 1e-2 * (1. - 2. / RAND_MAX * random());
-	b->vel.z = 1e-2 * (1. - 2. / RAND_MAX * random());
-	b->pos.x = 0.8 * POS_RANGE / RAND_MAX * random();
-	b->pos.y = 0.8 * POS_RANGE / RAND_MAX * random();
-	b->pos.z = 0.8 * POS_RANGE / RAND_MAX * random();
+double rand_between(double min, double max) {
+	double r = random() * 1.0 / RAND_MAX;
+	return min + r * (max - min);
 }
+
+void init_body(Body *b) {
+	b->mass = rand_between(MASS_MIN, MASS_MIN + MASS_RANGE);
+	b->vel.x = 3e-3 * rand_between(-1, 1);
+	b->vel.y = 3e-3 * rand_between(-1, 1);
+	b->vel.z = 3e-3 * rand_between(-1, 1);
+	b->pos.x = 0.8 * rand_between(-POS_RANGE, +POS_RANGE);
+	b->pos.y = 0.8 * rand_between(-POS_RANGE, +POS_RANGE);
+	b->pos.z = 0.8 * rand_between(-POS_RANGE, +POS_RANGE);
+}
+
 
 void init_bodies(Body bodies[], int len) {
 	srandom(RAND_SEED);
