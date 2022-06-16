@@ -60,8 +60,8 @@ int parse_args(Args * parsed, int argc, char **argv) {
 	parsed->far = strtod(argv[2], NULL);
 	if (parsed->far <= 0.) {
 		return 1;
-	} else if (parsed->far > 1.) {
-		eprintf("Warning: using a far threshold greater than 1 is unlikely to give good results\n");
+	} else if (parsed->far < 1.) {
+		eprintf("Warning: using a far threshold smaller than 1 is unlikely to give good results\n");
 	}
 #ifdef _OPENMP
 	parsed->workers = atoi(argv[3]);
@@ -95,8 +95,8 @@ void run(int num_bodies, int steps, double far_threshold) {
 
 BHTree * new_tree(int num_bodies) {
 	BHTree * tree = (BHTree *) malloc(sizeof(BHTree));
-	tree->halfsize = POS_RANGE/2;
-	Position center = {POS_RANGE/2, POS_RANGE/2, POS_RANGE/2};
+	tree->halfsize = POS_RANGE;
+	Position center = {0,0,0};
 	tree->center = center;
 	int initial_bufsize = (num_bodies / 8) + 8;
 	for (int i=0; i<8; i++) {
@@ -330,7 +330,7 @@ Acceleration get_total_accel(const Body * on, const BHTree * tree, double far_th
 Acceleration get_accel_from_node(const Body * on, const BHNode * node, const NodeBuffer * buffer, double far_threshold) {
 	double distance = length(vec_diff(node->center_of_mass, on->pos));
 	double width = 2 * node->halfsize;
-	bool is_far = width/distance < far_threshold;
+	bool is_far = distance/width > far_threshold;
 	if (is_far) {
 		return gravitational_acc(on->pos, node->center_of_mass, node->mass);
 	} else {
@@ -351,7 +351,7 @@ Acceleration get_accel_from_child(const Body *on, const BHChild *child, const No
 		a = get_accel_from_node(on, next, buffer, far_threshold);
 	} else if (child->type == BODY && child->body != on) {
 		a = gravitational_acc(on->pos, child->body->pos, child->body->mass);
-	}
+	} // else it's either an EMPTY node or the same body
 	return a;
 }
 
